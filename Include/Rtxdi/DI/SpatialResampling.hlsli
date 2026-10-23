@@ -22,6 +22,8 @@
 #error "RTXDI_NEIGHBOR_OFFSETS_BUFFER must be defined to point to a Buffer<float2> type resource"
 #endif
 
+#include "Rtxdi/DI/CGNSNeighborSelection.hlsli"
+
 // This macro can be defined in the including shader file to reduce code bloat
 // and/or remove ray tracing calls from temporal and spatial resampling shaders
 // if bias correction is not necessary.
@@ -53,16 +55,38 @@ RTXDI_DIReservoir RTXDI_DISpatialResamplingWithPairwiseMIS(
         ? max(sparams.numDisocclusionBoostSamples, sparams.numSamples)
         : sparams.numSamples;
 
+    RTXDI_DICGNSNeighborSelection cgnsSelection;
+    cgnsSelection.count = 0;
+    uint startIdx = 0;
+    if (sparams.enableCGNSNeighborSelection)
+    {
+        RTXDI_DISelectCGNSNeighbors(pixelPosition, centerSurface, rng, rParams, sparams, numSpatialSamples, cgnsSelection);
+        numSpatialSamples = cgnsSelection.count;
+    }
+    else
+    {
+        startIdx = uint(RTXDI_GetNextRandom(rng) * rParams.neighborOffsetMask);
+    }
+
     // Walk the specified number of neighbors, resampling using RIS
-    uint startIdx = uint(RTXDI_GetNextRandom(rng) * rParams.neighborOffsetMask);
     uint validSpatialSamples = 0;
     uint i;
     for (i = 0; i < numSpatialSamples; ++i)
     {
         // Get screen-space location of neighbor
-        uint sampleIdx = (startIdx + i) & rParams.neighborOffsetMask;
-        int2 spatialOffset = int2(float2(RTXDI_NEIGHBOR_OFFSETS_BUFFER[sampleIdx].xy) * sparams.samplingRadius);
-        int2 idx = int2(pixelPosition)+spatialOffset;
+        int2 spatialOffset;
+        int2 idx;
+        if (sparams.enableCGNSNeighborSelection)
+        {
+            idx = cgnsSelection.pixels[i];
+            spatialOffset = idx - int2(pixelPosition);
+        }
+        else
+        {
+            uint sampleIdx = (startIdx + i) & rParams.neighborOffsetMask;
+            spatialOffset = int2(float2(RTXDI_NEIGHBOR_OFFSETS_BUFFER[sampleIdx].xy) * sparams.samplingRadius);
+            idx = int2(pixelPosition)+spatialOffset;
+        }
         idx = RAB_ClampSamplePositionIntoView(idx, false);
 
         RTXDI_ActivateCheckerboardPixel(idx, false, rParams.activeCheckerboardField);
@@ -163,8 +187,6 @@ RTXDI_DIReservoir RTXDI_DISpatialResampling(
 
     RTXDI_CombineDIReservoirs(state, centerSample, /* random = */ 0.5f, centerSample.targetPdf);
 
-    uint startIdx = uint(RTXDI_GetNextRandom(rng) * rParams.neighborOffsetMask);
-    
     uint i;
     uint numSpatialSamples = sparams.numSamples;
     if(centerSample.M < sparams.targetHistoryLength)
@@ -172,6 +194,19 @@ RTXDI_DIReservoir RTXDI_DISpatialResampling(
 
     // Clamp the sample count at 32 to make sure we can keep the neighbor mask in an uint (cachedResult)
     numSpatialSamples = min(numSpatialSamples, 32);
+
+    RTXDI_DICGNSNeighborSelection cgnsSelection;
+    cgnsSelection.count = 0;
+    uint startIdx = 0;
+    if (sparams.enableCGNSNeighborSelection)
+    {
+        RTXDI_DISelectCGNSNeighbors(pixelPosition, centerSurface, rng, rParams, sparams, numSpatialSamples, cgnsSelection);
+        numSpatialSamples = cgnsSelection.count;
+    }
+    else
+    {
+        startIdx = uint(RTXDI_GetNextRandom(rng) * rParams.neighborOffsetMask);
+    }
 
     // We loop through neighbors twice.  Cache the validity / edge-stopping function
     //   results for the 2nd time through.
@@ -181,9 +216,19 @@ RTXDI_DIReservoir RTXDI_DISpatialResampling(
     for (i = 0; i < numSpatialSamples; ++i)
     {
         // Get screen-space location of neighbor
-        uint sampleIdx = (startIdx + i) & rParams.neighborOffsetMask;
-        int2 spatialOffset = int2(float2(RTXDI_NEIGHBOR_OFFSETS_BUFFER[sampleIdx].xy) * sparams.samplingRadius);
-        int2 idx = int2(pixelPosition) + spatialOffset;
+        int2 spatialOffset;
+        int2 idx;
+        if (sparams.enableCGNSNeighborSelection)
+        {
+            idx = cgnsSelection.pixels[i];
+            spatialOffset = idx - int2(pixelPosition);
+        }
+        else
+        {
+            uint sampleIdx = (startIdx + i) & rParams.neighborOffsetMask;
+            spatialOffset = int2(float2(RTXDI_NEIGHBOR_OFFSETS_BUFFER[sampleIdx].xy) * sparams.samplingRadius);
+            idx = int2(pixelPosition) + spatialOffset;
+        }
 
         idx = RAB_ClampSamplePositionIntoView(idx, false);
 
@@ -251,10 +296,17 @@ RTXDI_DIReservoir RTXDI_DISpatialResampling(
                 // If we skipped this neighbor above, do so again.
                 if ((cachedResult & (1u << uint(i))) == 0) continue;
 
-                uint sampleIdx = (startIdx + i) & rParams.neighborOffsetMask;
-
                 // Get the screen-space location of our neighbor
-                int2 idx = int2(pixelPosition) + int2(float2(RTXDI_NEIGHBOR_OFFSETS_BUFFER[sampleIdx].xy) * sparams.samplingRadius);
+                int2 idx;
+                if (sparams.enableCGNSNeighborSelection)
+                {
+                    idx = cgnsSelection.pixels[i];
+                }
+                else
+                {
+                    uint sampleIdx = (startIdx + i) & rParams.neighborOffsetMask;
+                    idx = int2(pixelPosition) + int2(float2(RTXDI_NEIGHBOR_OFFSETS_BUFFER[sampleIdx].xy) * sparams.samplingRadius);
+                }
 
                 idx = RAB_ClampSamplePositionIntoView(idx, false);
 
