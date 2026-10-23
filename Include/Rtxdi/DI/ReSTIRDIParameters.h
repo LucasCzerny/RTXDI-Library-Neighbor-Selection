@@ -158,9 +158,13 @@ struct RTXDI_DISpatialResamplingParameters
     // Prevents samples which are from the current frame or have no reasonable temporal history merged being spread to neighbors
     uint32_t discountNaiveSamples;
 
+    uint32_t enableCGNSNeighborSelection;
+    uint32_t cgnsNumCandidates;
+    float cgnsScaleSolidAngle;
+    float cgnsNormalBeta;
+    uint32_t enableCGNSEarlyStopping;
+    float cgnsEarlyStopCutoff;
     uint32_t pad1;
-    uint32_t pad2;
-    uint32_t pad3;
 };
 
 struct RTXDI_DISpatioTemporalResamplingParameters

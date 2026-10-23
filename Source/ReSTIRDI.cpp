@@ -83,6 +83,12 @@ RTXDI_DISpatialResamplingParameters GetDefaultReSTIRDISpatialResamplingParams()
     params.enableMaterialSimilarityTest = true;
     params.discountNaiveSamples = true;
     params.targetHistoryLength = 0;
+    params.enableCGNSNeighborSelection = 0;
+    params.cgnsNumCandidates = 32;
+    params.cgnsScaleSolidAngle = 0.05f;
+    params.cgnsNormalBeta = 8.0f;
+    params.enableCGNSEarlyStopping = 1;
+    params.cgnsEarlyStopCutoff = 0.5f;
     return params;
 }
 

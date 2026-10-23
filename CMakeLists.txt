@@ -5,6 +5,8 @@ set(sources
 	"Include/Rtxdi/RtxdiTypes.h"
 	"Include/Rtxdi/RtxdiUtils.h"
 	"Include/Rtxdi/DI/BoilingFilter.hlsli"
+	"Include/Rtxdi/DI/CGNSNeighborSelection.hlsli"
+	"Include/Rtxdi/DI/CGNSUtils.hlsli"
 	"Include/Rtxdi/DI/InitialSampling.hlsli"
 	"Include/Rtxdi/DI/PairwiseStreaming.hlsli"
 	"Include/Rtxdi/DI/Reservoir.hlsli"
