@@ -312,19 +312,37 @@ float RTXDI_Erf(float x)
 }
 
 float RTXDI_CalculatePValue(
+    float meanA,
+    float varianceA,
+    float statMA,
+    float meanB,
+    float varianceB,
+    float statMB)
+{
+    float varA = max((statMA > 1.0) ? varianceA * statMA / (statMA - 1.0) : 0.0, 0.0);
+    float varB = max((statMB > 1.0) ? varianceB * statMB / (statMB - 1.0) : 0.0, 0.0);
+
+    float se = sqrt(varA / max(statMA, 1.0) + varB / max(statMB, 1.0));
+    if (se <= 0.0)
+        return (meanA == meanB) ? 1.0 : 0.0;
+
+    // z score
+    float z = (meanA - meanB) / se;
+    return saturate(1.0 - RTXDI_Erf(abs(z) / sqrt(2.0)));
+}
+
+float RTXDI_CalculatePValue(
     const RTXDI_DIReservoir a,
     const RTXDI_DIReservoir b)
 {
-    float varA = max((a.statM > 1.0) ? a.variance * a.statM / (a.statM - 1.0) : 0.0, 0.0);
-    float varB = max((b.statM > 1.0) ? b.variance * b.statM / (b.statM - 1.0) : 0.0, 0.0);
+    return RTXDI_CalculatePValue(a.mean, a.variance, a.statM, b.mean, b.variance, b.statM);
+}
 
-    float se = sqrt(varA / max(a.statM, 1.0) + varB / max(b.statM, 1.0));
-    if (se <= 0.0)
-        return (a.mean == b.mean) ? 1.0 : 0.0;
-
-    // z score
-    float z = (a.mean - b.mean) / se;
-    return saturate(1.0 - RTXDI_Erf(abs(z) / sqrt(2.0)));
+float RTXDI_CalculatePValue(
+    const RTXDI_DIReservoir a,
+    float4 bStats)
+{
+    return RTXDI_CalculatePValue(a.mean, a.variance, a.statM, bStats.x, bStats.y, bStats.z);
 }
 #endif
 

@@ -90,6 +90,8 @@ RTXDI_DISpatialResamplingParameters GetDefaultReSTIRDISpatialResamplingParams()
     params.enableCGNSEarlyStopping = 1;
     params.cgnsEarlyStopCutoff = 0.5f;
     params.pValueThreshold = 0.05f;
+    params.pValueNumCandidates = 16;
+    params.pValueEarlyStopThreshold = 0.1f;
     return params;
 }
 

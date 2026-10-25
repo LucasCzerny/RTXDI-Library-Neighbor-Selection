@@ -26,6 +26,12 @@
 #error "RTXDI_LIGHT_RESERVOIR_BUFFER must be defined to point to a RWStructuredBuffer<RTXDI_PackedDIReservoir> type resource"
 #endif
 
+#if RTXDI_DI_NEIGHBOR_SELECTION_MODE == RTXDI_DI_NEIGHBOR_SELECTION_MODE_PVALUE
+#ifndef RTXDI_DI_RESERVOIR_STATS_BUFFER
+#error "RTXDI_DI_RESERVOIR_STATS_BUFFER must be defined to point to a RWStructuredBuffer<float4> type resource"
+#endif
+#endif
+
 // Encoding helper constants for RTXDI_PackedDIReservoir.distanceAge
 static const uint RTXDI_PackedDIReservoir_DistanceChannelBits = 8;
 static const uint RTXDI_PackedDIReservoir_DistanceXShift = 0;
@@ -70,6 +76,11 @@ void RTXDI_StoreDIReservoir(
 {
     uint pointer = RTXDI_ReservoirPositionToPointer(reservoirParams, reservoirPosition, reservoirArrayIndex);
     RTXDI_LIGHT_RESERVOIR_BUFFER[pointer] = RTXDI_PackDIReservoir(reservoir);
+
+#if RTXDI_DI_NEIGHBOR_SELECTION_MODE == RTXDI_DI_NEIGHBOR_SELECTION_MODE_PVALUE
+    float storedStatM = RTXDI_IsValidDIReservoir(reservoir) ? reservoir.statM : -1.0;
+    RTXDI_DI_RESERVOIR_STATS_BUFFER[pointer] = float4(reservoir.mean, reservoir.variance, storedStatM, reservoir.M);
+#endif
 }
 #endif // RTXDI_ENABLE_STORE_RESERVOIR
 
@@ -107,5 +118,16 @@ RTXDI_DIReservoir RTXDI_LoadDIReservoir(
     uint pointer = RTXDI_ReservoirPositionToPointer(reservoirParams, reservoirPosition, reservoirArrayIndex);
     return RTXDI_UnpackDIReservoir(RTXDI_LIGHT_RESERVOIR_BUFFER[pointer]);
 }
+
+#if RTXDI_DI_NEIGHBOR_SELECTION_MODE == RTXDI_DI_NEIGHBOR_SELECTION_MODE_PVALUE
+float4 RTXDI_LoadDIReservoirStats(
+    RTXDI_ReservoirBufferParameters reservoirParams,
+    uint2 reservoirPosition,
+    uint reservoirArrayIndex)
+{
+    uint pointer = RTXDI_ReservoirPositionToPointer(reservoirParams, reservoirPosition, reservoirArrayIndex);
+    return RTXDI_DI_RESERVOIR_STATS_BUFFER[pointer];
+}
+#endif
 
 #endif // RTXDI_DI_RESERVOIR_STORAGE_HLSLI

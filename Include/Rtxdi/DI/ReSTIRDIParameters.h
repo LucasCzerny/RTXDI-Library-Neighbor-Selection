@@ -183,6 +183,15 @@ struct RTXDI_DISpatialResamplingParameters
 
     // PValue neighbor selection rejects candidates with a p-value below this threshold.
     float pValueThreshold;
+
+    // Number of candidate neighbors scored per pixel for PValue neighbor selection.
+    uint32_t pValueNumCandidates;
+
+    // PValue neighbor selection stops early once a candidate reaches this p-value.
+    float pValueEarlyStopThreshold;
+
+    uint32_t pad1;
+    uint32_t pad2;
 };
 
 struct RTXDI_DISpatioTemporalResamplingParameters

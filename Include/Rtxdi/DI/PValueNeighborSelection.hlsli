@@ -43,21 +43,20 @@ float RTXDI_PValueComputeCandidateScore(
         sparams.normalThreshold, sparams.depthThreshold))
         return 0.0f;
 
-    RTXDI_DIReservoir candidateSample = RTXDI_LoadDIReservoir(
-        reservoirParams,
-        RTXDI_PixelPosToReservoirPos(uint2(candidatePixel), rParams.activeCheckerboardField),
-        sourceBufferIndex);
+    uint2 candidateReservoirPos = RTXDI_PixelPosToReservoirPos(uint2(candidatePixel), rParams.activeCheckerboardField);
 
-    if (!RTXDI_IsValidDIReservoir(candidateSample) || candidateSample.M <= 0.0)
+    float4 candidateStats = RTXDI_LoadDIReservoirStats(reservoirParams, candidateReservoirPos, sourceBufferIndex);
+
+    if (candidateStats.z <= 0.0 || candidateStats.w <= 0.0)
         return 0.0f;
 
-    if (sparams.discountNaiveSamples && candidateSample.M <= RTXDI_NAIVE_SAMPLING_M_THRESHOLD)
+    if (sparams.discountNaiveSamples && candidateStats.w <= RTXDI_NAIVE_SAMPLING_M_THRESHOLD)
         return 0.0f;
 
-    if (centerSample.statM <= 0.0 || candidateSample.statM <= 0.0)
+    if (centerSample.statM <= 0.0)
         return 0.0f;
 
-    float pValue = RTXDI_CalculatePValue(centerSample, candidateSample);
+    float pValue = RTXDI_CalculatePValue(centerSample, candidateStats);
     float threshold = clamp(sparams.pValueThreshold, 0.0f, 1.0f);
 
     return (pValue >= threshold) ? pValue : 0.0f;
@@ -81,7 +80,8 @@ void RTXDI_DISelectPValueNeighbors(
     if (numSpatialSamples == 0)
         return;
 
-    uint candidateCount = clamp(sparams.cgnsNumCandidates, 1u, 128u);
+    uint candidateCount = clamp(sparams.pValueNumCandidates, 1u, 128u);
+    float earlyStopThreshold = clamp(sparams.pValueEarlyStopThreshold, 0.0f, 1.0f);
     uint startIndex = uint(RTXDI_GetNextRandom(rng) * rParams.neighborOffsetMask);
 
     if (numSpatialSamples == 1)
@@ -100,7 +100,7 @@ void RTXDI_DISelectPValueNeighbors(
 
             res.tryUpdate(candidatePixel, score, RTXDI_GetNextRandom(rng));
 
-            if (sparams.enableCGNSEarlyStopping && score >= sparams.cgnsEarlyStopCutoff)
+            if (sparams.enableCGNSEarlyStopping && score >= earlyStopThreshold)
                 break;
         }
 
@@ -128,7 +128,7 @@ void RTXDI_DISelectPValueNeighbors(
 
             res.tryUpdate(candidatePixel, score, RTXDI_GetNextRandom(rng), numSpatialSamples);
 
-            if (sparams.enableCGNSEarlyStopping && score >= sparams.cgnsEarlyStopCutoff)
+            if (sparams.enableCGNSEarlyStopping && score >= earlyStopThreshold)
             {
                 if (++highQualityCount >= numSpatialSamples)
                     break;
