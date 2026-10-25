@@ -46,12 +46,24 @@ enum class ReSTIRDI_SpatioTemporalBiasCorrectionMode : uint32_t
     Pairwise = RTXDI_BIAS_CORRECTION_PAIRWISE,
     Raytraced = RTXDI_BIAS_CORRECTION_RAY_TRACED
 };
+
+enum class ReSTIRDI_NeighborSelectionMode : uint32_t
+{
+    Off = 0,
+    CGNS = 1,
+    PValue = 2
+};
 #else
 #define ReSTIRDI_LocalLightSamplingMode uint32_t
 #define ReSTIRDI_TemporalBiasCorrectionMode uint32_t
 #define ReSTIRDI_SpatialBiasCorrectionMode uint32_t
 #define ReSTIRDI_SpatioTemporalBiasCorrectionMode uint32_t
+#define ReSTIRDI_NeighborSelectionMode uint32_t
 #endif
+
+#define RTXDI_DI_NEIGHBOR_SELECTION_MODE_OFF 0
+#define RTXDI_DI_NEIGHBOR_SELECTION_MODE_CGNS 1
+#define RTXDI_DI_NEIGHBOR_SELECTION_MODE_PVALUE 2
 
 struct RTXDI_DIBufferIndices
 {
@@ -158,13 +170,19 @@ struct RTXDI_DISpatialResamplingParameters
     // Prevents samples which are from the current frame or have no reasonable temporal history merged being spread to neighbors
     uint32_t discountNaiveSamples;
 
-    uint32_t enableCGNSNeighborSelection;
+    // Selects the spatial neighbor scoring method: Off, CGNS, or PValue.
+    ReSTIRDI_NeighborSelectionMode neighborSelectionMode;
+
+    // Number of candidate neighbors scored per pixel before weighted reservoir sampling.
     uint32_t cgnsNumCandidates;
+
     float cgnsScaleSolidAngle;
     float cgnsNormalBeta;
     uint32_t enableCGNSEarlyStopping;
     float cgnsEarlyStopCutoff;
-    uint32_t pad1;
+
+    // PValue neighbor selection rejects candidates with a p-value below this threshold.
+    float pValueThreshold;
 };
 
 struct RTXDI_DISpatioTemporalResamplingParameters

@@ -14,6 +14,11 @@
 #define RTXDI_DIRESERVOIR_HLSLI
 
 #include "Rtxdi/RtxdiParameters.h"
+#include "Rtxdi/DI/ReSTIRDIParameters.h"
+
+#ifndef RTXDI_DI_NEIGHBOR_SELECTION_MODE
+#define RTXDI_DI_NEIGHBOR_SELECTION_MODE RTXDI_DI_NEIGHBOR_SELECTION_MODE_OFF
+#endif
 
 // This structure represents a single light reservoir that stores the weights, the sample ref,
 // sample count (M), and visibility for reuse. It can be serialized into RTXDI_PackedDIReservoir for storage.
@@ -48,6 +53,11 @@ struct RTXDI_DIReservoir
 
     // Cannonical weight when using pairwise MIS (ignored except during pairwise MIS computations)
     float canonicalWeight;
+
+    // Statistics
+    float mean;
+    float variance;
+    float statM; // M is set to 1 in InitialSampling.hlsli
 };
 
 // Encoding helper constants for RTXDI_PackedDIReservoir.mVisibility
@@ -73,6 +83,9 @@ RTXDI_DIReservoir RTXDI_EmptyDIReservoir()
     s.spatialDistance = int2(0, 0);
     s.age = 0;
     s.canonicalWeight = 0;
+    s.mean = 0;
+    s.variance = 0;
+    s.statM = 0;
     return s;
 }
 
@@ -170,6 +183,22 @@ bool RTXDI_StreamSample(
     // Update the weight sum
     reservoir.weightSum += risWeight;
 
+#if RTXDI_DI_NEIGHBOR_SELECTION_MODE == RTXDI_DI_NEIGHBOR_SELECTION_MODE_PVALUE
+    reservoir.statM += 1;
+
+    float invStatM = 1.0 / reservoir.statM;
+
+    float prevMean = reservoir.mean;
+    reservoir.mean = prevMean + (targetPdf - prevMean) * invStatM;
+
+    float prevVariance = reservoir.variance;
+    reservoir.variance = (
+        prevVariance
+        + ((targetPdf - prevMean) * (targetPdf - reservoir.mean) - prevVariance)
+        * invStatM
+    );
+#endif
+
     // Decide if we will randomly pick this sample
     bool selectSample = (random * reservoir.weightSum < risWeight);
 
@@ -206,6 +235,25 @@ bool RTXDI_InternalSimpleResample(
 
     // Update the weight sum
     reservoir.weightSum += risWeight;
+
+#if RTXDI_DI_NEIGHBOR_SELECTION_MODE == RTXDI_DI_NEIGHBOR_SELECTION_MODE_PVALUE
+    float totalStatM = max(reservoir.statM + newReservoir.statM, 1e-5);
+    float invTotalStatM = 1.0 / totalStatM;
+
+    float newReservoirRatio = newReservoir.statM * invTotalStatM;
+    float totalMean = reservoir.mean + (newReservoir.mean - reservoir.mean) * newReservoirRatio;
+
+    float meanDiff = reservoir.mean - totalMean;
+    float newMeanDiff = newReservoir.mean - totalMean;
+
+    float SSE = reservoir.statM * reservoir.variance + newReservoir.statM * newReservoir.variance;
+    float SSG = reservoir.statM * meanDiff * meanDiff + newReservoir.statM * newMeanDiff * newMeanDiff;
+    float SST = SSE + SSG;
+    reservoir.variance = SST * invTotalStatM;
+
+    reservoir.mean = totalMean;
+    reservoir.statM = totalStatM;
+#endif
 
     // Decide if we will randomly pick this sample
     bool selectSample = (random * reservoir.weightSum < risWeight);
@@ -253,5 +301,31 @@ void RTXDI_FinalizeResampling(
 
     reservoir.weightSum = (denominator == 0.0) ? 0.0 : (reservoir.weightSum * normalizationNumerator) / denominator;
 }
+
+#if RTXDI_DI_NEIGHBOR_SELECTION_MODE == RTXDI_DI_NEIGHBOR_SELECTION_MODE_PVALUE
+// what did abramowitz and stegun smoke to find this formula
+float RTXDI_Erf(float x)
+{
+    float t = 1.0 / (1.0 + 0.3275911 * abs(x));
+    float y = 1.0 - (((((1.061405429 * t - 1.453152027) * t) + 1.421413741) * t - 0.284496736) * t + 0.254829592) * t * exp(-x * x);
+    return sign(x) * y;
+}
+
+float RTXDI_CalculatePValue(
+    const RTXDI_DIReservoir a,
+    const RTXDI_DIReservoir b)
+{
+    float varA = max((a.statM > 1.0) ? a.variance * a.statM / (a.statM - 1.0) : 0.0, 0.0);
+    float varB = max((b.statM > 1.0) ? b.variance * b.statM / (b.statM - 1.0) : 0.0, 0.0);
+
+    float se = sqrt(varA / max(a.statM, 1.0) + varB / max(b.statM, 1.0));
+    if (se <= 0.0)
+        return (a.mean == b.mean) ? 1.0 : 0.0;
+
+    // z score
+    float z = (a.mean - b.mean) / se;
+    return saturate(1.0 - RTXDI_Erf(abs(z) / sqrt(2.0)));
+}
+#endif
 
 #endif // RTXDI_DIRESERVOIR_HLSLI

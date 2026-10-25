@@ -8,6 +8,7 @@ set(sources
 	"Include/Rtxdi/DI/CGNSNeighborSelection.hlsli"
 	"Include/Rtxdi/DI/CGNSUtils.hlsli"
 	"Include/Rtxdi/DI/InitialSampling.hlsli"
+	"Include/Rtxdi/DI/PValueNeighborSelection.hlsli"
 	"Include/Rtxdi/DI/PairwiseStreaming.hlsli"
 	"Include/Rtxdi/DI/Reservoir.hlsli"
 	"Include/Rtxdi/DI/ReservoirStorage.hlsli"

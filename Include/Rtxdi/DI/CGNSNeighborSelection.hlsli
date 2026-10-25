@@ -164,8 +164,7 @@ void RTXDI_DISelectCGNSNeighbors(
         for (uint k = 0; k < candidateCount; k++)
         {
             int2 candidatePixel;
-            float score = RTXDI_CGNSComputeCandidateScore(
-                pixelPosition, startIndex + k, rParams, sparams, centerValid, centerPos, centerNormal, scale, candidatePixel);
+            float score = RTXDI_CGNSComputeCandidateScore(pixelPosition, startIndex + k, rParams, sparams, centerValid, centerPos, centerNormal, scale, candidatePixel);
             if (score <= 0.0f)
                 continue;
 

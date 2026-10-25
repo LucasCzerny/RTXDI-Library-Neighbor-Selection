@@ -141,6 +141,9 @@ struct RTXDI_PackedDIReservoir
     uint32_t distanceAge;
     float targetPdf;
     float weight;
+    float mean;
+    float variance;
+    float statM;
 };
 
 #endif // RTXDI_PARAMETERS_H

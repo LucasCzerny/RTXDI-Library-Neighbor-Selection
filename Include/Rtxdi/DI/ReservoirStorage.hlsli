@@ -54,6 +54,9 @@ RTXDI_PackedDIReservoir RTXDI_PackDIReservoir(const RTXDI_DIReservoir reservoir)
 
     data.targetPdf = reservoir.targetPdf;
     data.weight = reservoir.weightSum;
+    data.mean = reservoir.mean;
+    data.variance = reservoir.variance;
+    data.statM = reservoir.statM;
 
     return data;
 }
@@ -77,6 +80,9 @@ RTXDI_DIReservoir RTXDI_UnpackDIReservoir(RTXDI_PackedDIReservoir data)
     res.uvData = data.uvData;
     res.targetPdf = data.targetPdf;
     res.weightSum = data.weight;
+    res.mean = data.mean;
+    res.variance = data.variance;
+    res.statM = data.statM;
     res.M = (data.mVisibility >> RTXDI_PackedDIReservoir_MShift) & RTXDI_PackedDIReservoir_MaxM;
     res.packedVisibility = data.mVisibility & RTXDI_PackedDIReservoir_VisibilityMask;
     // Sign extend the shift values
